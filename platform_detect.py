@@ -3,6 +3,7 @@ platform_detect.py
 Detects OS, Linux distro family, and available package managers.
 """
 
+import os
 import platform
 import shutil
 from dataclasses import dataclass, field
@@ -14,6 +15,111 @@ from typing import Optional
 IS_WINDOWS: bool = platform.system() == "Windows"
 IS_LINUX:   bool = platform.system() == "Linux"
 IS_MAC:     bool = platform.system() == "Darwin"
+
+
+# ── Expanded PATH search ───────────────────────────────────────────────────────
+def _expanded_path() -> str:
+    """
+    Build a PATH string that includes common tool install locations that are
+    stripped when running under sudo or from a launcher without a full shell env.
+
+    Covers:
+      - System defaults  /usr/bin  /usr/local/bin  /bin  /sbin
+      - User local       ~/.local/bin
+      - nvm              ~/.nvm/versions/node/*/bin  (all installed node versions)
+      - fnm              ~/.local/share/fnm/node-versions/*/installation/bin
+      - volta            ~/.volta/bin
+      - n                ~/n/bin
+      - nodenv           ~/.nodenv/shims  ~/.nodenv/bin
+      - pyenv            ~/.pyenv/shims   ~/.pyenv/bin
+      - rbenv            ~/.rbenv/shims   ~/.rbenv/bin
+      - Homebrew (Linux) /home/linuxbrew/.linuxbrew/bin
+      - Cargo            ~/.cargo/bin
+      - Go               ~/go/bin
+      - Snap bins        /snap/bin
+      - Windows extras   %APPDATA%\npm  %PROGRAMFILES%\nodejs
+    """
+    home  = Path.home()
+    extra: list[str] = []
+
+    if IS_LINUX or IS_MAC:
+        # System
+        extra += ["/usr/local/sbin", "/usr/local/bin", "/usr/sbin",
+                  "/usr/bin", "/sbin", "/bin"]
+        # User
+        extra.append(str(home / ".local" / "bin"))
+        # nvm — glob all installed node versions
+        nvm_root = Path(os.environ.get("NVM_DIR", home / ".nvm"))
+        for node_bin in sorted((nvm_root / "versions" / "node").glob("*/bin")):
+            extra.append(str(node_bin))
+        # fnm
+        for node_bin in sorted((home / ".local" / "share" / "fnm" /
+                                 "node-versions").glob("*/installation/bin")):
+            extra.append(str(node_bin))
+        # volta
+        extra.append(str(home / ".volta" / "bin"))
+        # n
+        extra.append(str(home / "n" / "bin"))
+        # nodenv
+        extra += [str(home / ".nodenv" / "shims"),
+                  str(home / ".nodenv" / "bin")]
+        # pyenv
+        extra += [str(home / ".pyenv" / "shims"),
+                  str(home / ".pyenv" / "bin")]
+        # rbenv
+        extra += [str(home / ".rbenv" / "shims"),
+                  str(home / ".rbenv" / "bin")]
+        # Homebrew on Linux
+        extra += ["/home/linuxbrew/.linuxbrew/bin",
+                  "/home/linuxbrew/.linuxbrew/sbin"]
+        # Cargo / Go
+        extra += [str(home / ".cargo" / "bin"),
+                  str(home / "go" / "bin")]
+        # Snap
+        extra.append("/snap/bin")
+
+    elif IS_WINDOWS:
+        app_data  = os.environ.get("APPDATA",      str(home / "AppData" / "Roaming"))
+        prog      = os.environ.get("PROGRAMFILES",  r"C:\Program Files")
+        prog_x86  = os.environ.get("PROGRAMFILES(X86)", r"C:\Program Files (x86)")
+        local_app = os.environ.get("LOCALAPPDATA", str(home / "AppData" / "Local"))
+        extra += [
+            str(Path(app_data) / "npm"),
+            str(Path(prog) / "nodejs"),
+            str(Path(prog_x86) / "nodejs"),
+            str(Path(local_app) / "Programs" / "Python" / "Python312"),
+            str(Path(local_app) / "Programs" / "Python" / "Python311"),
+            str(Path(local_app) / "Programs" / "Python" / "Python310"),
+            str(Path(prog) / "Git" / "cmd"),
+        ]
+        # nvm-windows
+        nvm_home = os.environ.get("NVM_HOME", str(home / "AppData" / "Roaming" / "nvm"))
+        for node_dir in sorted(Path(nvm_home).glob("v*")):
+            extra.append(str(node_dir))
+        # volta
+        extra.append(str(home / ".volta" / "bin"))
+        # fnm on Windows
+        extra.append(str(Path(local_app) / "fnm"))
+
+    # Merge: existing PATH entries first, then extras (deduped, order preserved)
+    existing = os.environ.get("PATH", "").split(os.pathsep)
+    seen: set[str] = set()
+    merged: list[str] = []
+    for p in existing + extra:
+        if p and p not in seen:
+            seen.add(p)
+            merged.append(p)
+
+    return os.pathsep.join(merged)
+
+
+# Compute once at import time
+_SEARCH_PATH: str = _expanded_path()
+
+
+def _cmd(name: str) -> bool:
+    """Return True if `name` is found anywhere on the expanded PATH."""
+    return shutil.which(name, path=_SEARCH_PATH) is not None
 
 
 # ── Distro families ───────────────────────────────────────────────────────────

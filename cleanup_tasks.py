@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable, List, Optional
 
-from platform_detect import PLATFORM, Distro
+from platform_detect import PLATFORM, Distro, _SEARCH_PATH
 import path_resolver as pr
 
 Log = Callable[[str], None]
@@ -351,7 +351,7 @@ def lx_flush_dns(log: Log) -> int:
         ["service", "nscd", "restart"],
         ["systemctl", "restart", "dnsmasq"],
     ):
-        if shutil.which(cmd[0]):
+        if shutil.which(cmd[0], path=_SEARCH_PATH):
             if _sudo_run(cmd, log):
                 log(f"  ✓ DNS flushed via {cmd[0]}")
                 return 0
@@ -617,7 +617,7 @@ class TaskDef:
 
 
 def _has(tool: str) -> bool:
-    return shutil.which(tool) is not None
+    return shutil.which(tool, path=_SEARCH_PATH) is not None
 
 
 def build_task_catalogue() -> List[TaskDef]:

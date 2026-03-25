@@ -26,7 +26,7 @@ from PyQt6.QtWidgets import (
 )
 
 from cleanup_tasks   import TaskDef, build_task_catalogue
-from platform_detect import PLATFORM
+from platform_detect import PLATFORM, _SEARCH_PATH
 from workers         import CleanupWorker, FolderSizeWorker
 
 KIND_COLORS: Dict[str, str] = {
@@ -48,8 +48,13 @@ def _fmt_bytes(n: int) -> str:
 
 
 def _cmd_exists(name: str) -> bool:
+    """
+    Find a command using the same expanded PATH as platform_detect so tools
+    installed via nvm, volta, fnm, pyenv, ~/.local/bin etc. are found even
+    when launched under sudo or from a desktop shortcut with a stripped PATH.
+    """
     import shutil
-    return shutil.which(name) is not None
+    return shutil.which(name, path=_SEARCH_PATH) is not None
 
 
 # ══════════════════════════════════════════════════════════════════════════════

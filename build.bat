@@ -1,29 +1,34 @@
 @echo off
-:: =============================
-:: Build script for Garbage Collector
-:: =============================
+:: =============================================
+:: Build script — Garbage Collector (Windows)
+:: =============================================
 
+set EXE_NAME=GarbageCollector
 set ENTRY=main.py
-
-set EXE_NAME=GarbageCollector.exe
-
-:: Icon file
 set ICON=trash-logo.ico
 
-:: Cleanup previous builds
 echo Cleaning previous builds...
-rmdir /s /q build
-rmdir /s /q dist
-del /q "%EXE_NAME%"
+if exist build     rmdir /s /q build
+if exist dist      rmdir /s /q dist
+if exist "%EXE_NAME%.spec" del /q "%EXE_NAME%.spec"
 
-:: Build with PyInstaller
 echo Building executable...
-pyinstaller --clean --onefile --noconsole --icon="%ICON%" --name "%EXE_NAME%" "%ENTRY%"
+pyinstaller --clean ^
+    --onefile ^
+    --noconsole ^
+    --icon="%ICON%" ^
+    --name "%EXE_NAME%" ^
+    --add-data "ui_styles.py;." ^
+    --add-data "ui_main.py;." ^
+    --add-data "workers.py;." ^
+    --add-data "cleanup_tasks.py;." ^
+    --add-data "platform_detect.py;." ^
+    "%ENTRY%"
 
-:: Cleanup spec file and temporary folders
-del /q "%ENTRY:.py=.spec%"
-del /q "%EXE_NAME:.py=.spec%"
-rmdir /s /q build
+:: Tidy up
+del /q "%EXE_NAME%.spec" 2>nul
+rmdir /s /q build 2>nul
 
-echo Build finished. Executable is in the 'dist' folder.
+echo.
+echo Build complete. Executable: dist\%EXE_NAME%.exe
 pause

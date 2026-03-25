@@ -4,7 +4,7 @@ Entry point for Garbage Collector.
 """
 
 import sys
-from platform_detect import IS_WINDOWS, IS_LINUX
+from platform_detect import IS_WINDOWS
 
 # ── Elevate on Windows ────────────────────────────────────────────────────────
 if IS_WINDOWS:
@@ -16,20 +16,15 @@ if IS_WINDOWS:
 
 # ── Qt application ────────────────────────────────────────────────────────────
 from PyQt6.QtWidgets import QApplication
-from PyQt6.QtCore    import Qt
-
 from ui_main   import MainWindow
 from ui_styles import QSS
 
 
 def main():
+    # AA_UseHighDpiPixmaps was removed in Qt6 — high-DPI is on by default
     app = QApplication(sys.argv)
     app.setStyle("Fusion")
     app.setStyleSheet(QSS)
-
-    # High-DPI
-    app.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
-
     win = MainWindow()
     win.show()
     sys.exit(app.exec())
